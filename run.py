@@ -3,17 +3,32 @@
 import time
 import shelve
 import os
+import sys
 import signal
-import math
+import openpyxl
+import tkinter as tk
+from tkinter import filedialog
 
 from selenium import webdriver
 from selenium.webdriver.support.wait import WebDriverWait
 
-DATA_PATH = "votedata"
+BASE_PATH = os.getcwd()
+DATA_PATH = BASE_PATH + "/votedata"
 # 微信投票的地址
 URL = 'https://mp.weixin.qq.com/s/THi2tZEqI8zPlAUxTpZlZA'
 # 显示多少次取值
 COUNT = 10
+# 刷新时间
+WAITTIME = 60
+
+
+def save_file():
+    window = tk.Tk()
+    window.withdraw()
+    file_path = filedialog.asksaveasfilename(title=u'保存文件', filetypes=[(
+        "xlsx", ".xlsx"), ('All Files', '*')], initialdir=(os.path.expanduser(BASE_PATH)))
+    file_path = file_path+'.xlsx'
+    return file_path
 
 
 def pushData(data):
@@ -22,7 +37,7 @@ def pushData(data):
                             time.localtime(time.time()))] = data
 
 
-def getData():
+def getData(count=0):
     data = {}
     with shelve.open(DATA_PATH) as read:
         keys = list(read.keys())
@@ -30,7 +45,8 @@ def getData():
             keys.sort()
         except:
             pass
-        keys = keys[-COUNT:]
+        if not count == 0:
+            keys = keys[-count:]
         for key in keys:
             data[key] = read[key]
     return data
@@ -55,7 +71,7 @@ def run():
     votes = getVote()
     votes = votes['vote_subject'][0]['options']
     pushData(votes)
-    votes = getData()
+    votes = getData(COUNT)
     data = {}
     title = []
     for votetime in votes:
@@ -73,7 +89,7 @@ def run():
     for key in keys:
         alpha_num = 0
         for i in range(len(key)):
-            if ord(key[i]) in range(65,91) or ord(key[i]) in range(97,123) or ord(key[i])==32:
+            if ord(key[i]) in range(65, 91) or ord(key[i]) in range(97, 123) or ord(key[i]) == 32:
                 alpha_num += 1
         re[key.ljust(keyL+int(alpha_num/2), '　')] = data[key]
     title_date = '　'*keyL+' '
@@ -89,24 +105,55 @@ def run():
         print(key+':'+re[key]+'|')
 
 
-chromeOptions = webdriver.ChromeOptions()
-chromeOptions.add_argument('--headless')
-BROWER = webdriver.Chrome(options=chromeOptions)
-wait = WebDriverWait(BROWER, 10)
-BROWER.maximize_window()
-BROWER.implicitly_wait(6)
-
-
 def quit(signum, frame):
     BROWER.quit()
     print('正在退出...')
     exit()
 
 
+def export():
+
+    votes = getData()
+    date = list(votes.keys())
+
+    data = {}
+    for votetime in votes:
+        for vote in votes[votetime]:
+            if not vote['name'] in data:
+                data[vote['name']] = []
+            data[vote['name']].append(vote['cnt'])
+
+    f = openpyxl.Workbook()  # 创建工作簿
+
+    sheet1 = f.create_sheet(title='votes')
+
+    names = list(data.keys())
+    for d in range(len(date)):
+        sheet1.cell(row=1, column=d+2).value = str(date[d])
+    for r in range(len(names)):
+        sheet1.cell(row=r+2, column=1).value = str(names[r])
+        for c in range(len(data[names[r]])):
+            sheet1.cell(row=r+2, column=c+2).value = int(data[names[r]][c])
+
+    f.save(save_file())  # 保存文件
+
+
 if __name__ == "__main__":
-    signal.signal(signal.SIGINT, quit)
-    signal.signal(signal.SIGTERM, quit)
-    while True:
-        os.system('clear')
-        run()
-        time.sleep(60)
+    if len(sys.argv) > 1:
+        if sys.argv[1] == 'export':
+            export()
+        else:
+            print('未知参数')
+    else:
+        chromeOptions = webdriver.ChromeOptions()
+        chromeOptions.add_argument('--headless')
+        BROWER = webdriver.Chrome(options=chromeOptions)
+        wait = WebDriverWait(BROWER, 10)
+        BROWER.maximize_window()
+        BROWER.implicitly_wait(6)
+        signal.signal(signal.SIGINT, quit)
+        signal.signal(signal.SIGTERM, quit)
+        while True:
+            os.system('clear')
+            run()
+            time.sleep(WAITTIME)
