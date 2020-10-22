@@ -98,5 +98,5 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, quit)
     while True:
         os.system('clear')
-        run();
+        run()
         time.sleep(60)
