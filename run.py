@@ -4,15 +4,17 @@ import time
 import shelve
 import os
 import signal
+import math
 
 from selenium import webdriver
 from selenium.webdriver.support.wait import WebDriverWait
 
 DATA_PATH = "votedata"
-#微信投票的地址
+# 微信投票的地址
 URL = 'https://mp.weixin.qq.com/s/THi2tZEqI8zPlAUxTpZlZA'
-#显示多少次取值
+# 显示多少次取值
 COUNT = 10
+
 
 def pushData(data):
     with shelve.open(DATA_PATH) as write:
@@ -48,6 +50,7 @@ def getVote():
     voteInfo = BROWER.execute_script('return voteInfo')
     return voteInfo
 
+
 def run():
     votes = getVote()
     votes = votes['vote_subject'][0]['options']
@@ -68,18 +71,23 @@ def run():
     keyL = len(max(data.keys(), key=len))
     re = {}
     for key in keys:
-        re[key.ljust(keyL, '　')] = data[key]
+        alpha_num = 0
+        for i in range(len(key)):
+            if ord(key[i]) in range(65,91) or ord(key[i]) in range(97,123) or ord(key[i])==32:
+                alpha_num += 1
+        re[key.ljust(keyL+int(alpha_num/2), '　')] = data[key]
     title_date = '　'*keyL+' '
     title_time = '　'*keyL+' '
     for key in title:
         title_date += str(key[0])+'|'
         title_time += str(key[1]).center(10, ' ')+'|'
-    
+
     print(title_date)
     print(title_time)
 
     for key in re:
         print(key+':'+re[key]+'|')
+
 
 chromeOptions = webdriver.ChromeOptions()
 chromeOptions.add_argument('--headless')
@@ -88,10 +96,12 @@ wait = WebDriverWait(BROWER, 10)
 BROWER.maximize_window()
 BROWER.implicitly_wait(6)
 
+
 def quit(signum, frame):
     BROWER.quit()
     print('正在退出...')
     exit()
+
 
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, quit)
